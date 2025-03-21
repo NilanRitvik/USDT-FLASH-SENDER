@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRYPTO FLASH SENDER</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/walletconnect/1.7.4/walletconnect.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@binance-chain/bsc-connector"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tronlink/tronweb"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #1a1a2e; color: white; text-align: center; padding: 50px; }
+        .container { background: #0f3460; padding: 30px; border-radius: 10px; width: 400px; margin: auto; box-shadow: 0px 0px 10px rgba(255, 255, 255, 0.2); }
+        h2 { color: #f4a261; }
+        select, input, button { width: 90%; padding: 10px; margin: 10px 0; border-radius: 5px; border: none; font-size: 16px; }
+        button { background-color: #e94560; color: white; cursor: pointer; }
+        button:hover { background-color: #f4a261; }
+        .hidden { display: none; }
+        .success { margin-top: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="login-container" class="container">
+        <h2>Login to CRYPTO FLASH SENDER </h2>
+        <p>USDT / BNB / ETH / SOLANA / BTC </p>
+              <p>Subscription : $120 USDT </P>
+              <p>Period : 7 days </P>
+              <p>USDT Limit : 20000 USDT</P>
+              <p> All other tokens limit mentioned in home page </p> 
+        <select id="user-type" onchange="handleUserSelection()">
+            <option value="admin">Admin</option>
+            <option value="user">User</option>
+        </select>
+        <input type="text" id="user-id" placeholder="User ID">
+        <input type="password" id="password" placeholder="Password">
+        <p id="user-wallet" class="hidden">Wallet: 0xce055D5cE1EB3194f370E0773dFE9CE09a88445e (Only USDT ERC-20)</p>
+        <button onclick="login()">Login</button>
+        <p id="login-error" style="color: red; display: none;">Invalid Credentials!</p>
+    </div>
+
+    <div id="main-container" class="container hidden">
+        <h2>FLASH Sender</h2>
+        <label>Select Network:</label>
+        <select id="network" onchange="updateTokens()">
+            <option value="" disabled selected>Select Network</option>
+            <option value="ERC20">ERC-20</option>
+            <option value="TRC20">TRC-20</option>
+            <option value="BEP20">BEP-20</option>
+            <option value="BTC">BTC</option>
+            <option value="SOLANA">Solana</option>
+        </select>
+
+        <label>Select Token:</label>
+        <select id="token">
+            <option value="" disabled selected>Select a Network First</option>
+        </select>
+
+        <label>Enter Address:</label>
+        <input type="text" id="address" placeholder="0x...">
+
+        <label>Enter Quantity:</label>
+        <input type="number" id="quantity" placeholder="Enter Amount">
+
+        <button onclick="sendToken()">Send</button>
+        <p id="transaction-status" class="success hidden"></p>
+    </div>
+
+    <script>
+        function handleUserSelection() {
+            let userType = document.getElementById("user-type").value;
+            let walletInfo = document.getElementById("user-wallet");
+            walletInfo.classList.toggle("hidden", userType !== "user");
+        }
+
+        function login() {
+            let userType = document.getElementById("user-type").value;
+            let userId = document.getElementById("user-id").value;
+            let password = document.getElementById("password").value;
+            if ((userType === "admin" && userId === "Flash" && password === "Nilan@101088") || (userType === "user" && userId && password)) {
+                document.getElementById("login-container").classList.add("hidden");
+                document.getElementById("main-container").classList.remove("hidden");
+            } else {
+                document.getElementById("login-error").style.display = "block";
+            }
+        }
+
+        function updateTokens() {
+            let network = document.getElementById("network").value;
+            let tokenSelect = document.getElementById("token");
+            let tokens = {
+                "ERC20": ["Ethereum (ETH)", "Tether USD (USDT)"],
+                "TRC20": ["Tron (TRX)", "Tether USD (USDT)"],
+                "BEP20": ["Binance Coin (BNB)", "Tether USD (USDT)"],
+                "BTC": ["Bitcoin (BTC)", "Wrapped Bitcoin (WBTC)"],
+                "SOLANA": ["Solana (SOL)", "Tether USD (USDT)"]
+            };
+            tokenSelect.innerHTML = "";
+            tokens[network].forEach(token => {
+                let option = document.createElement("option");
+                option.text = token;
+                tokenSelect.add(option);
+            });
+        }
+
+        function generateTransactionHash() {
+            let chars = "abcdef0123456789";
+            let hash = "0x";
+            for (let i = 0; i < 64; i++) {
+                hash += chars[Math.floor(Math.random() * chars.length)];
+            }
+            return hash;
+        }
+
+        function generateRandomBlock() {
+            return Math.floor(100000 + Math.random() * 900000);
+        }
+
+        function sendToken() {
+            let network = document.getElementById("network").value;
+            let token = document.getElementById("token").value;
+            let address = document.getElementById("address").value;
+            let quantity = document.getElementById("quantity").value;
+            let statusMsg = document.getElementById("transaction-status");
+            if (!network || !token || !address || quantity === "") {
+                alert("Please fill all details before sending!");
+                return;
+            }
+            statusMsg.classList.remove("hidden");
+            statusMsg.innerHTML = "🔄 Connecting to Server...";
+            setTimeout(() => { statusMsg.innerHTML = "⏳ Processing Transaction..."; }, 2000);
+            setTimeout(() => { let blockNumber = generateRandomBlock(); statusMsg.innerHTML = `✅ Block Confirmation: #${blockNumber}`; }, 4000);
+            setTimeout(() => { let txHash = generateTransactionHash(); statusMsg.innerHTML = `✅ Transferred Successfully!<br>Transaction Hash: <br>${txHash}`; }, 6000);
+        }
+    </script>
+</body>
+</html>
